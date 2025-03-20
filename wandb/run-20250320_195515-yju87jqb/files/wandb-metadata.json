@@ -1,0 +1,31 @@
+{
+  "os":  "Windows-10-10.0.26100-SP0",
+  "python":  "CPython 3.11.11",
+  "startedAt":  "2025-03-20T11:55:15.233329Z",
+  "args":  [
+    "--app",
+    ".",
+    "--num-supernodes",
+    "10"
+  ],
+  "program":  "-m __main__",
+  "email":  "824059542@qq.com",
+  "root":  "D:\\FLIMSYS\\flsys",
+  "host":  "MglsBrick2",
+  "executable":  "D:\\miniconda\\envs\\FLIMAGE\\python.exe",
+  "cpu_count":  8,
+  "cpu_count_logical":  16,
+  "disk":  {
+    "/":  {
+      "total":  "806438408192",
+      "used":  "551303311360"
+    }
+  },
+  "memory":  {
+    "total":  "33618710528"
+  },
+  "cpu":  {
+    "count":  8,
+    "countLogical":  16
+  }
+}
