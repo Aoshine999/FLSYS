@@ -10,7 +10,6 @@ Ref: https://github.com/d-li14/mobilenetv3.pytorch/blob/master/mobilenetv3.py
 
 import torch.nn as nn
 import torch.nn.functional as F
-import math
 from torchvision.models import mobilenet_v3_small
 from collections import OrderedDict
 

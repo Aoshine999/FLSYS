@@ -6,7 +6,8 @@ from datetime import datetime
 from flwr.common import Parameters, FitRes, parameters_to_ndarrays
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg, FedProx, FedAdam
-from flsys.task import Net, set_weights, get_mobilenet_v3_small_model
+from flsys.task import Net, set_weights
+from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model
 
 class CustomFedAvg(FedAvg):
     def __init__(self,*args,**kwargs):
@@ -61,4 +62,5 @@ class CustomFedAvg(FedAvg):
 class CustomFedProx(FedProx):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
     
