@@ -26,12 +26,18 @@ serverapp = "flsys.server_app:app"
 clientapp = "flsys.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 5
-fraction-fit = 0.5
-local-epochs = 1
+num-server-rounds = 30
+fraction-fit = 1.0
+local-epochs = 2
+
 
 [tool.flwr.federations]
 default = "local-simulation"
 
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 10
+options.backend.client-resources.num-cpus = 4
+
+[tool.flwr.federations.local-deployment]
+address = "127.0.0.1:9093"
+root-certificates = "./certificates/ca.crt"

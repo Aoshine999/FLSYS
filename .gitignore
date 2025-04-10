@@ -141,7 +141,8 @@ venv.bak/
 # mkdocs documentation
 /site
 /wandb
-
+/certificates
+/global_model_param
 # mypy
 .mypy_cache/
 .dmypy.json

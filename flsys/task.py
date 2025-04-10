@@ -11,38 +11,44 @@ from torch.utils.data import DataLoader
 from torchvision.transforms import Compose, Normalize, ToTensor
 
 
+
 class Net(nn.Module):
     """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
 
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = nn.Conv2d(1, 6, 5)
+        self.conv1 = nn.Conv2d(3, 6, 5)
         self.pool = nn.MaxPool2d(2, 2)
         self.conv2 = nn.Conv2d(6, 16, 5)
-        self.fc1 = nn.Linear(16 * 4 * 4, 120)
+        self.fc1 = nn.Linear(16 * 5 * 5, 120)
         self.fc2 = nn.Linear(120, 84)
         self.fc3 = nn.Linear(84, 10)
 
     def forward(self, x):
         x = self.pool(F.relu(self.conv1(x)))
         x = self.pool(F.relu(self.conv2(x)))
-        x = x.view(-1, 16 * 4 * 4)
+        x = x.view(-1, 16 * 5 * 5)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         return self.fc3(x)
 
 def get_transforms():
+    # pytorch_transforms = Compose(
+    #     [ToTensor(), Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))]
+    # )
     pytorch_transforms = Compose(
-        [ToTensor(), Normalize((0.5,), (0.5, ))]
+        [ToTensor(), Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))] 
     )
 
     def apply_transforms(batch):
         """Apply transforms to the partition from FederatedDataset."""
-        batch["image"] = [pytorch_transforms(img) for img in batch["image"]]
+        batch["img"] = [pytorch_transforms(img) for img in batch["img"]]
         return batch
     return apply_transforms
 
 fds = None  # Cache FederatedDataset
+
+
 
 
 def load_data(partition_id: int, num_partitions: int):
@@ -52,7 +58,7 @@ def load_data(partition_id: int, num_partitions: int):
     if fds is None:
         partitioner = DirichletPartitioner(num_partitions=num_partitions,partition_by="label",alpha=1.0)
         fds = FederatedDataset(
-            dataset="zalando-datasets/fashion_mnist",
+            dataset="uoft-cs/cifar10",
             partitioners={"train": partitioner},
         )
     partition = fds.load_partition(partition_id)
@@ -70,12 +76,13 @@ def train(net, trainloader, epochs, lr,device):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    #optimizer = torch.optim.Adam(net.parameters(), lr=lr,weight_decay=1e-5)
+    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9,weight_decay=1e-5)
     net.train()
     running_loss = 0.0
     for _ in range(epochs):
         for batch in trainloader:
-            images = batch["image"]
+            images = batch["img"]
             labels = batch["label"]
             optimizer.zero_grad()
             loss = criterion(net(images.to(device)), labels.to(device))
@@ -94,7 +101,7 @@ def test(net, testloader, device):
     correct, loss = 0, 0.0
     with torch.no_grad():
         for batch in testloader:
-            images = batch["image"].to(device)
+            images = batch["img"].to(device)
             labels = batch["label"].to(device)
             outputs = net(images)
             loss += criterion(outputs, labels).item()
@@ -114,6 +121,5 @@ def set_weights(net, parameters):
     net.load_state_dict(state_dict, strict=True)
 
 if __name__ == "__main__":
-    net = Net()
-    print(net.state_dict().keys())
-    print(net)
+
+    x = torch.randn(1,3,32,32)

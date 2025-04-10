@@ -3,8 +3,9 @@ import json
 from typing import List,Tuple
 from flwr.common import Context, ndarrays_to_parameters, Metrics
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig
-from flwr.server.strategy import FedAvg
+from flwr.server.strategy import FedAvg, DifferentialPrivacyServerSideFixedClipping
 from flsys.task import Net, get_weights, set_weights, test, get_transforms
+from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model
 from torch.utils.data import DataLoader
 from datasets import load_dataset
 from flsys.my_strategy import CustomFedAvg
@@ -13,7 +14,8 @@ def get_evaluate_fn(testloader,device):
     """return a callback that evaluates the gloabl model"""
     def evaluate(server_round, parameters_ndarrays, config):
         #Instance model
-        net = Net()
+        #net = Net()
+        net = get_mobilenet_v3_small_model(10,False)
         #Apply global_model parameter
         set_weights(net,parameters_ndarrays)
         net.to(device)
@@ -54,12 +56,16 @@ def server_fn(context: Context):
     num_rounds = context.run_config["num-server-rounds"]
     fraction_fit = context.run_config["fraction-fit"]
 
+    #print("---------------------------",context.run_config)
+    #num_clients = context.node_config["num-clients"]
+
     # Initialize model parameters
-    ndarrays = get_weights(Net())
+    #ndarrays = get_weights(Net())
+    ndarrays = get_weights(get_mobilenet_v3_small_model(10,True))
     parameters = ndarrays_to_parameters(ndarrays)
 
     # load test dataset
-    testset = load_dataset("zalando-datasets/fashion_mnist")["test"]
+    testset = load_dataset("uoft-cs/cifar10")["test"]
 
     #construct testloader
     testloader = DataLoader(testset.with_transform(get_transforms()), batch_size=32)
@@ -67,13 +73,20 @@ def server_fn(context: Context):
     # Define strategy
     strategy = CustomFedAvg(
         fraction_fit=fraction_fit,
-        fraction_evaluate=1.0,
+        fraction_evaluate=0.5,
         min_available_clients=2,
         initial_parameters=parameters,
         evaluate_metrics_aggregation_fn=weighted_average,
         on_fit_config_fn=on_fit_config,
         evaluate_fn=get_evaluate_fn(testloader,device="cpu"),
         fit_metrics_aggregation_fn=handle_fit_metrics,
+    )
+
+    dp_strategy = DifferentialPrivacyServerSideFixedClipping(
+        strategy=strategy,
+        noise_multiplier=0.7,
+        clipping_norm=5.0,
+        num_sampled_clients=10,
     )
     config = ServerConfig(num_rounds=num_rounds)
 
@@ -82,3 +95,5 @@ def server_fn(context: Context):
 
 # Create ServerApp
 app = ServerApp(server_fn=server_fn)
+
+
