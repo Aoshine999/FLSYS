@@ -10,13 +10,16 @@ Ref: https://github.com/d-li14/mobilenetv3.pytorch/blob/master/mobilenetv3.py
 
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import mobilenet_v3_small
+from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 from collections import OrderedDict
 
 
 def get_mobilenet_v3_small_model(num_classes: int,pretrained: bool):
     """Get MobileNetV3 Small model."""
-    model = mobilenet_v3_small(pretrained=pretrained)
+    if pretrained == True:
+        model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.IMAGENET1K_V1)
+    else:
+        model = mobilenet_v3_small()
     model.features[0][0] = nn.Conv2d(
         in_channels=3,
         out_channels=16,
@@ -32,8 +35,6 @@ def get_mobilenet_v3_small_model(num_classes: int,pretrained: bool):
     )
 
     return model
-
-
 
 
 
@@ -329,6 +330,8 @@ class MobileNetV3(nn.Module):
 
 
 
+
+
 if __name__ == "__main__":
     width_multiplier = 1
     #from torchsummaryX import summary
@@ -397,3 +400,4 @@ if __name__ == "__main__":
     '''
 
 
+    model = mobilenet_v3_small(norm_layer=lambda x: nn.GroupNorm(2,x))

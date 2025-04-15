@@ -13,6 +13,8 @@ dependencies = [
     "torch==2.5.1",
     "torchvision==0.20.1",
     "wandb",
+    "matplotlib",
+    "tqdm",
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -26,7 +28,7 @@ serverapp = "flsys.server_app:app"
 clientapp = "flsys.client_app:app"
 
 [tool.flwr.app.config]
-num-server-rounds = 30
+num-server-rounds = 10
 fraction-fit = 1.0
 local-epochs = 2
 
@@ -37,6 +39,8 @@ default = "local-simulation"
 [tool.flwr.federations.local-simulation]
 options.num-supernodes = 10
 options.backend.client-resources.num-cpus = 4
+
+
 
 [tool.flwr.federations.local-deployment]
 address = "127.0.0.1:9093"

@@ -10,6 +10,7 @@ from torch.utils.data import DataLoader
 from datasets import load_dataset
 from flsys.my_strategy import CustomFedAvg
 
+
 def get_evaluate_fn(testloader,device):
     """return a callback that evaluates the gloabl model"""
     def evaluate(server_round, parameters_ndarrays, config):

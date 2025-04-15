@@ -4,7 +4,7 @@ import torch
 import json
 from random import random
 from flwr.client import ClientApp, NumPyClient
-from flwr.common import Context, ConfigsRecord
+from flwr.common import Context, ConfigsRecord, Metrics
 from flsys.task import Net, get_weights, load_data, set_weights, test, train
 from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model
 
