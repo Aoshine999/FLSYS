@@ -56,7 +56,7 @@ def load_data(partition_id: int, num_partitions: int):
     # Only initialize `FederatedDataset` once
     global fds
     if fds is None:
-        partitioner = DirichletPartitioner(num_partitions=num_partitions,partition_by="label",alpha=1.0)
+        partitioner = DirichletPartitioner(num_partitions=num_partitions,partition_by="label",alpha=0.5,shuffle=True,seed=42,self_balancing=True)
         fds = FederatedDataset(
             dataset="uoft-cs/cifar10",
             partitioners={"train": partitioner},
@@ -123,3 +123,6 @@ def set_weights(net, parameters):
 if __name__ == "__main__":
 
     x = torch.randn(1,3,32,32)
+
+
+    

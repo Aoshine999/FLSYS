@@ -1,29 +1,37 @@
 """flsys: A Flower / PyTorch app."""
 import json
+import wandb
+import os
+import sys
 from typing import List,Tuple
 from flwr.common import Context, ndarrays_to_parameters, Metrics
-from flwr.server import ServerApp, ServerAppComponents, ServerConfig
+from flwr.server import ServerApp, ServerAppComponents, ServerConfig, Grid, LegacyContext
 from flwr.server.strategy import FedAvg, DifferentialPrivacyServerSideFixedClipping
+from flwr.server.workflow import DefaultWorkflow, SecAggPlusWorkflow
 from flsys.task import Net, get_weights, set_weights, test, get_transforms
 from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model
 from torch.utils.data import DataLoader
 from datasets import load_dataset
 from flsys.my_strategy import CustomFedAvg
 
+#from flsys.config import config as configLoader
 
 def get_evaluate_fn(testloader,device):
     """return a callback that evaluates the gloabl model"""
     def evaluate(server_round, parameters_ndarrays, config):
         #Instance model
-        #net = Net()
-        net = get_mobilenet_v3_small_model(10,False)
+        # if configLoader.model.type == "mobilenet_v3_small":
+        #     net = get_mobilenet_v3_small_model(10,False)
+        # else:
+        #     net = Net()
+        net = Net()
         #Apply global_model parameter
         set_weights(net,parameters_ndarrays)
         net.to(device)
         #Run test
-        loss, accuarcy = test(net, testloader,device)
+        loss, accuracy = test(net, testloader,device)
 
-        return loss, {"cen_accuarcy":accuarcy}
+        return loss, {"cen_accuracy":accuracy}
     
     return evaluate
 
@@ -61,8 +69,13 @@ def server_fn(context: Context):
     #num_clients = context.node_config["num-clients"]
 
     # Initialize model parameters
-    #ndarrays = get_weights(Net())
-    ndarrays = get_weights(get_mobilenet_v3_small_model(10,True))
+    # if config.model.type == "mobilenet_v3_small":
+    #     ndarrays = get_weights(get_mobilenet_v3_small_model(10,True))
+    # else:
+    #     ndarrays = get_weights(Net())
+
+
+    ndarrays = get_weights(Net())
     parameters = ndarrays_to_parameters(ndarrays)
 
     # load test dataset
@@ -89,12 +102,78 @@ def server_fn(context: Context):
         clipping_norm=5.0,
         num_sampled_clients=10,
     )
+
     config = ServerConfig(num_rounds=num_rounds)
 
     return ServerAppComponents(strategy=strategy, config=config)
 
 
 # Create ServerApp
+# app = ServerApp()
 app = ServerApp(server_fn=server_fn)
 
+# @app.main()
+# def main(grid:Grid, context:Context):
 
+#     # Read from config
+#     num_rounds = context.run_config["num-server-rounds"]
+#     fraction_fit = context.run_config["fraction-fit"]
+    
+#     # Initialize model parameters
+#     # if configLoader.model.type == "mobilenet_v3_small":
+#     #     ndarrays = get_weights(get_mobilenet_v3_small_model(10,True))
+#     # else:
+#     #     ndarrays = get_weights(Net())
+
+#     ndarrays = get_weights(Net())
+#     parameters = ndarrays_to_parameters(ndarrays)
+
+#     # load test dataset
+#     testset = load_dataset("uoft-cs/cifar10")["test"]
+
+#     #construct testloader
+#     testloader = DataLoader(testset.with_transform(get_transforms()), batch_size=32)
+
+
+#     # Define strategy
+#     strategy = CustomFedAvg(
+#         fraction_fit=1.0,
+#         fraction_evaluate=0.5,
+#         min_available_clients=2,
+#         initial_parameters=parameters,
+#         evaluate_metrics_aggregation_fn=weighted_average,
+#         on_fit_config_fn=on_fit_config,
+#         evaluate_fn=get_evaluate_fn(testloader,device="cpu"),
+#         fit_metrics_aggregation_fn=handle_fit_metrics,
+#     )
+
+
+#     context = LegacyContext(
+#         context=context,
+#         config=ServerConfig(num_rounds=num_rounds),
+#         strategy=strategy,
+#     )
+
+
+#     fit_workflow = SecAggPlusWorkflow(
+#         num_shares=context.run_config["num-shares"],
+#         reconstruction_threshold=context.run_config["reconstruction-threshold"],
+#         max_weight=context.run_config["max-weight"],
+#     )
+
+
+        
+#     # Create the workflow
+#     workflow = DefaultWorkflow(fit_workflow=fit_workflow)
+
+#     # Execute
+#     workflow(grid, context)
+
+#     # Finish wandb run
+#     exit(0)
+
+        
+
+
+
+   

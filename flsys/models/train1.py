@@ -334,7 +334,7 @@ if __name__ == "__main__":
         "seed": 42                # 固定随机种子以保证实验可复现性
     }
     # 启动训练过程
-    train(config)
+    #train(config)
 
     # 调试路径的打印输出 (通常在最终脚本中不需要)
     # print(os.getcwd())

@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
 from collections import OrderedDict
-
+#from flsys.config import config
 
 def get_mobilenet_v3_small_model(num_classes: int,pretrained: bool):
     """Get MobileNetV3 Small model."""
@@ -333,7 +333,7 @@ class MobileNetV3(nn.Module):
 
 
 if __name__ == "__main__":
-    width_multiplier = 1
+    #width_multiplier = 1
     #from torchsummaryX import summary
     
     # cifar10
@@ -400,4 +400,6 @@ if __name__ == "__main__":
     '''
 
 
-    model = mobilenet_v3_small(norm_layer=lambda x: nn.GroupNorm(2,x))
+    #model = mobilenet_v3_small(norm_layer=lambda x: nn.GroupNorm(2,x))
+    # print(f"当前模型: {config.model.type}")
+    # print(f"W&B项目: {config.wandb.project}")

@@ -1,0 +1,22 @@
+# 模型配置节
+[model]
+type = "Net"    # 可选值：Net / MobileNetV3
+num_classes = 10        # 分类任务类别数
+pretrained = false       # 是否使用预训练权重
+save_dir = "global_model_param"  # 模型保存目录
+
+# Weights & Biases 配置节
+[wandb]
+project = "FL_image_recognition_sys"  # W&B项目名称
+enabled = true          # 是否启用W&B记录
+entity = "your_team"    # 团队/用户名（可选）
+
+# 训练参数节
+[training]
+server_rounds = 10      # 服务端总训练轮次
+proximal_mu = 0.1       # FedProx超参数
+momentum = 0.9          # FedAvgM动量参数
+
+# 策略选择节
+[strategy]
+default = "FedAvg"      # 默认策略选择

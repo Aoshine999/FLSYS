@@ -274,7 +274,7 @@ if __name__ == "__main__":
         "pretrained": True,
         "seed": 42        # 固定随机种子
     }
-    train(config)
+    #train(config)
 
     # print(os.getcwd())
     # path = os.path.join("global_model_param","central_model")

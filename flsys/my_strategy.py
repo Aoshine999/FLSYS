@@ -3,12 +3,12 @@ import os
 import json
 import wandb
 from datetime import datetime
-from flwr.common import Parameters, FitRes, parameters_to_ndarrays, FitIns, Scalar, NDArrays
+from flwr.common import Parameters, FitRes, parameters_to_ndarrays, FitIns, Scalar, NDArrays, log
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg, FedProx, FedAdam, FedAvgM, FedAdagrad, FedYogi
 from flsys.task import Net, set_weights
 from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model
-
+#from flsys.config import config
 
 
 
@@ -19,7 +19,7 @@ class CustomFedAvg(FedAvg):
         name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         self.model_param_save_dir = os.path.join("global_model_param",name)
         os.mkdir(self.model_param_save_dir)
-        wandb.init(project="FL_image_recognition_sys", name=f"custom-strategy-FedAvg-{name}")
+        #wandb.init(project="FL_image_recognition_sys", name=f"custom-strategy-FedAvg-{name}")
 
     def aggregate_fit(self, 
                       server_round: int, 
@@ -32,8 +32,12 @@ class CustomFedAvg(FedAvg):
         ndarrays  = parameters_to_ndarrays(parameters_aggregated)
 
         #instance the model
-        #model = Net()
-        model = get_mobilenet_v3_small_model(10,False)
+        # if config.model.type == "MobileNetV3":
+        #     model = get_mobilenet_v3_small_model(10,False)
+        # else:
+        #     model = Net()
+        model = Net()
+  
         set_weights(model,ndarrays)
 
         #save model parameters in the standard pytorch way
@@ -46,9 +50,31 @@ class CustomFedAvg(FedAvg):
                  server_round:int, 
                  parameters: Parameters
                  ) -> tuple[float, dict[str, bool | bytes | float | int | str]] | None:
+        
+        best_acc = 0.0
         loss, metrics =  super().evaluate(server_round, parameters)
         
         my_results = {"loss" : loss, **metrics}
+
+
+
+        #存储最优模型
+        parameters_ndarrays = parameters_to_ndarrays(parameters)
+        # if config.model.type == "MobileNetV3":
+        #     model = get_mobilenet_v3_small_model(10,False)
+        # else:
+        #     model = Net()
+            
+        model = Net()    
+        set_weights(model,parameters_ndarrays)
+
+        if metrics["cen_accuracy"] > best_acc:
+            best_acc = metrics["cen_accuracy"]
+            torch.save(model.state_dict(), os.path.join(self.model_param_save_dir,"best_model.pth"))
+
+
+
+
         self.result_to_save[server_round] = my_results
 
         json_file_path = os.path.join(self.model_param_save_dir,"result.json")
@@ -57,7 +83,7 @@ class CustomFedAvg(FedAvg):
             json.dump(self.result_to_save,json_file,indent=4)
         
         #log to WB
-        wandb.log(my_results,step=server_round)
+        #wandb.log(my_results,step=server_round)
 
         return loss, metrics
 
