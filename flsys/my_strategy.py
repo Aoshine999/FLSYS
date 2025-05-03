@@ -7,8 +7,8 @@ from flwr.common import Parameters, FitRes, parameters_to_ndarrays, FitIns, Scal
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg, FedProx, FedAdam, FedAvgM, FedAdagrad, FedYogi
 from flsys.task import Net, set_weights
-from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model
-#from flsys.config import config
+from models.MobileNetV3 import get_mobilenet_v3_small_model
+from flsys.config import config as configLoader
 
 
 
@@ -16,10 +16,27 @@ class CustomFedAvg(FedAvg):
     def __init__(self,*args,**kwargs):
         super().__init__(*args,**kwargs)
         self.result_to_save = {}
-        name = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        self.model_name = configLoader.model.type
+
+        self.pj_stDate = datetime.now()
+
+        self.pj_edDate = None
+
+
+        name = self.model_name + "-custom-strategy-FedAvg-" + self.pj_stDate.strftime("%Y-%m-%d_%H-%M-%S")
+        
         self.model_param_save_dir = os.path.join("global_model_param",name)
+        self.result_to_save["model_name"] = name
+        self.result_to_save["total_train_time"] = None
+
         os.mkdir(self.model_param_save_dir)
-        #wandb.init(project="FL_image_recognition_sys", name=f"custom-strategy-FedAvg-{name}")
+
+        json_file_path = os.path.join(self.model_param_save_dir,"result.json")
+        #save result to json file
+        with open(json_file_path,"w") as json_file:
+            json.dump(self.result_to_save,json_file,indent=4)
+
+        wandb.init(project="FL_image_recognition_sys", name=f"{self.model_name}-custom-strategy-FedAvg-{name}", id=f"{self.model_name}-custom-strategy-FedAvg")
 
     def aggregate_fit(self, 
                       server_round: int, 
@@ -32,16 +49,16 @@ class CustomFedAvg(FedAvg):
         ndarrays  = parameters_to_ndarrays(parameters_aggregated)
 
         #instance the model
-        # if config.model.type == "MobileNetV3":
-        #     model = get_mobilenet_v3_small_model(10,False)
-        # else:
-        #     model = Net()
-        model = Net()
+        if configLoader.model.type == "MobileNetV3":
+            model = get_mobilenet_v3_small_model(10,False)
+        else:
+            model = Net()
+        #model = Net()
   
         set_weights(model,ndarrays)
 
         #save model parameters in the standard pytorch way
-        torch.save(model.state_dict(), os.path.join(self.model_param_save_dir,f"model_round_{server_round}"))
+        #torch.save(model.state_dict(), os.path.join(self.model_param_save_dir,f"model_round_{server_round}"))
 
         return parameters_aggregated, metrics_aggregated
 
@@ -60,12 +77,12 @@ class CustomFedAvg(FedAvg):
 
         #存储最优模型
         parameters_ndarrays = parameters_to_ndarrays(parameters)
-        # if config.model.type == "MobileNetV3":
-        #     model = get_mobilenet_v3_small_model(10,False)
-        # else:
-        #     model = Net()
+        if configLoader.model.type == "MobileNetV3":
+            model = get_mobilenet_v3_small_model(10,False)
+        else:
+            model = Net()
             
-        model = Net()    
+        #model = Net()    
         set_weights(model,parameters_ndarrays)
 
         if metrics["cen_accuracy"] > best_acc:
@@ -77,13 +94,24 @@ class CustomFedAvg(FedAvg):
 
         self.result_to_save[server_round] = my_results
 
+        self.pj_edDate = datetime.now()
+
+        # 计算并记录训练时间
+        hours = int ((self.pj_edDate - self.pj_stDate).total_seconds() // 3600)  # 转换为小时
+        minutes = int ((self.pj_edDate - self.pj_stDate).total_seconds() % 3600 // 60)  # 转换为分钟
+        seconds = int ((self.pj_edDate - self.pj_stDate).total_seconds() % 60)  # 转换为秒
+        total_time = f"{hours}h {minutes}m {seconds}s"
+
+        self.result_to_save["total_train_time"] = total_time
+
+
         json_file_path = os.path.join(self.model_param_save_dir,"result.json")
         #save result to json file
         with open(json_file_path,"w") as json_file:
             json.dump(self.result_to_save,json_file,indent=4)
         
         #log to WB
-        #wandb.log(my_results,step=server_round)
+        wandb.log(my_results,step=server_round)
 
         return loss, metrics
 

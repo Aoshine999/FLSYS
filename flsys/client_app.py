@@ -3,16 +3,13 @@
 import torch
 import json
 from random import random
-from flwr.client import ClientApp, NumPyClient, Client
-from flwr.common import Context, ConfigRecord, Metrics
+from flwr.client import ClientApp, NumPyClient
+from flwr.common import Context, ConfigRecord
 from flwr.client.mod import secaggplus_mod
 from flsys.task import Net, get_weights, load_data, set_weights, test, train
-from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model
-#from flsys.config import config as configLoader
-from flwr.server.workflow.secure_aggregation.secaggplus_workflow import (
-    SecAggPlusWorkflow,
-    WorkflowState,
-)
+from models.MobileNetV3 import get_mobilenet_v3_small_model
+from flsys.config import config as configLoader
+
 
 
 # Define Flower Client and client_fn
@@ -78,11 +75,11 @@ class FlowerClient(NumPyClient):
 
 def client_fn(context: Context):
     # Load model and data
-    # if configLoader.model.type == "mobilenet_v3_small":
-    #     net = get_mobilenet_v3_small_model(10,True)
-    # else:
-    #     net = Net()
-    net = Net()
+    if configLoader.model.type == "mobilenet_v3_small":
+        net = get_mobilenet_v3_small_model(10,True)
+    else:
+        net = Net()
+    #net = Net()
 
     partition_id = context.node_config["partition-id"]
     num_partitions = context.node_config["num-partitions"]
@@ -96,9 +93,9 @@ def client_fn(context: Context):
 # Flower ClientApp
 app = ClientApp(
     client_fn,
-    # mods=[
-    #     secaggplus_mod,
-    # ],
+    mods=[
+        secaggplus_mod,
+    ],
 
 )
 

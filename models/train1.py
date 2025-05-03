@@ -9,7 +9,7 @@ from torchvision.models import resnet18 # <--- 如未使用，已注释掉
 from torch.utils.data import DataLoader, Subset, random_split # <--- 已添加 Subset, random_split
 # from datasets import load_dataset, DatasetDict # <--- 已移除 HuggingFace datasets
 from tqdm import tqdm
-from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model # 假设此路径正确
+from models.MobileNetV3 import get_mobilenet_v3_small_model # 假设此路径正确
 import numpy as np # <--- 已添加
 
 # 假设 get_mobilenet_v3_small_model 在指定路径中已正确定义

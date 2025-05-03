@@ -2,13 +2,15 @@ import torch
 import os
 import wandb
 import torch.optim as optim
+import json
+from datetime import datetime
 from torchvision import transforms
 from torch.nn import GroupNorm
 from torchvision.models import resnet18
 from torch.utils.data import DataLoader
 from datasets import load_dataset, DatasetDict
 from tqdm import tqdm
-from flsys.models.MobileNetV3 import get_mobilenet_v3_small_model
+from models.MobileNetV3 import get_mobilenet_v3_small_model
 from torchvision.transforms import (
     CenterCrop,
     Compose,
@@ -132,7 +134,42 @@ def load_data(dataset_name = "uoft-cs",batch_size = 32,image_size = 224,val_rati
 
 
 def train(config):
-    wandb.init(project="MobileNetV3_samll centralization train", config=config)
+
+    st_Date = datetime.now()
+
+    date = st_Date.strftime("%Y-%m-%d_%H-%M-%S")
+
+    #记录模型名称(包含时间)
+    model_name = f"{config['model_name']}-central_model-{date}"
+
+    # 记录存储路径
+    path = os.path.join("global_model_param",model_name)
+        
+    os.makedirs(path, exist_ok=True)
+    result_dict = {}  # 新增：初始化结果字典
+
+    result_dict["model_name"] = model_name
+
+    json_path = os.path.join(path, "result.json")
+    with open(json_path, 'w') as f:
+        json.dump(result_dict, f, indent=4)
+
+
+
+    # 初始化模型
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    if config["model_name"] == "resnet18":
+        model = getresnet18_model(num_classes=config["name_classes"])
+    elif config["model_name"] == "mobilenet_v3_small":
+        model = get_mobilenet_v3_small_model(num_classes=config["name_classes"], pretrained=config["pretrained"])
+
+    #model = get_mobilenet_v3_small_model(num_classes=len(class_names), pretrained=config["pretrained"])
+
+    model.to(device)
+
+
+    wandb.init(project=f"{config['model_name']} centralization train", config=config,id=f"{config['model_name']}_centralization",name=f"{config['model_name']}_centralization_{date}")
 
     # 加载数据
     train_loader,val_loader, test_loader, class_names = load_data(
@@ -140,9 +177,9 @@ def train(config):
         val_ratio=config.get("val_ratio", 0.2)
     )
 
-    # 初始化模型
+    
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = get_mobilenet_v3_small_model(num_classes=len(class_names), pretrained=config["pretrained"])
+    #model = get_mobilenet_v3_small_model(num_classes=len(class_names), pretrained=config["pretrained"])
 
     model.to(device)
 
@@ -151,13 +188,12 @@ def train(config):
 
 
     # 学习率调度
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode='max',
-        factor=0.1,
-        patience=3,
-        verbose=True
-    )
+    # scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+    #     optimizer,
+    #     mode='max',
+    #     factor=0.1,
+    #     patience=3
+    # )
    
     best_acc = 0.0  # 初始化最佳准确率
     # 训练模型
@@ -182,10 +218,10 @@ def train(config):
             correct += (preds == labels).sum().item()
 
             # 记录batch指标
-            wandb.log({
-                "batch_loss": loss.item(),
-                "batch_acc": (preds == labels).float().mean().item()
-            })
+            # wandb.log({
+            #     "batch_loss": loss.item(),
+            #     "batch_acc": (preds == labels).float().mean().item()
+            # })
 
         # 记录epoch指标
         epoch_loss = training_loss / len(train_loader.dataset)
@@ -194,15 +230,9 @@ def train(config):
         # 验证阶段
         avg_val_loss, val_acc = evaluate_model(model, val_loader, criterion, device)
 
-        # 学习率调度
-        # scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        #     optimizer,
-        #     mode='max',
-        #     factor=0.1,
-        #     patience=3,
-        #     verbose=True
-        # )
 
+        # --- 更新学习率调度器 (基于验证准确率) ---
+        #scheduler.step(val_acc) # <--- 将验证准确率传递给调度器
         
         # 记录epoch指标
         wandb.log({
@@ -213,26 +243,56 @@ def train(config):
             #"lr": optimizer.param_groups[0]['lr']
         },step= epoch + 1)
 
-        
-        path = os.path.join("global_model_param","central_model")
-        
+                
+
         # 保存最佳模型
         if val_acc > best_acc:
+            print(f"验证准确率提升 ({best_acc:.4f} --> {val_acc:.4f}). 保存模型...")
             best_acc = val_acc
             torch.save(model.state_dict(), os.path.join(path,f"best_model.pth"))
             wandb.save("best_model.pth")
 
-    # 最终测试
+        # 记录到本地json文件中
+        result_dict[epoch+1] = {
+            "loss": avg_val_loss,
+            "cen_accuracy": val_acc
+        }
+
+        json_path = os.path.join(path, "result.json")
+        with open(json_path, 'w') as f:
+            json.dump(result_dict, f, indent=4)
+
+    # --- 训练结束，进行最终测试 ---
+    print("\n训练完成。加载最佳模型进行最终测试...")
     model.load_state_dict(torch.load(os.path.join(path,f"best_model.pth")))
     test_loss, test_acc = evaluate_model(model, test_loader, criterion, device)
 
-    # 根据验证准确率更新调度器
-    #scheduler.step(val_acc) # <--- 添加这一行
+
+
     # 记录最终结果
     wandb.log({
         "final_test_loss": test_loss,
         "final_test_acc": test_acc
     })
+
+    result_dict["final"] = {
+        "test_loss": test_loss,
+        "test_acc": test_acc
+    }
+    
+    ed_Date = datetime.now()
+
+    # 计算并记录训练时间
+    hours = int ((ed_Date - st_Date).total_seconds() // 3600)  # 转换为小时
+    minutes = int ((ed_Date - st_Date).total_seconds() % 3600 // 60)  # 转换为分钟
+    seconds = int ((ed_Date - st_Date).total_seconds() % 60)  # 转换为秒
+    train_time = f"{hours}h {minutes}m {seconds}s"
+
+    result_dict["total_train_time"] = train_time
+
+    json_path = os.path.join(path, "result.json")
+    with open(json_path, 'w') as f:
+        json.dump(result_dict, f, indent=4)
 
     # 打印结果对比
     print(f"\nBest Validation Accuracy: {best_acc:.2%}")
@@ -265,16 +325,18 @@ def evaluate_model(model, dataloader,criterion, device):
 if __name__ == "__main__":
     config = {
         "dataset_name": "uoft-cs/cifar10",
+        "model_name": "resnet18",
+        "name_classes": 10,
         "image_size": 32,
         "batch_size": 64,
-        "num_epochs": 50,
+        "num_epochs": 2,
         "lr": 0.01,
         "weight_decay": 1e-4,
-        "val_ratio": 0.3,  
+        "val_ratio": 0.2,  
         "pretrained": True,
         "seed": 42        # 固定随机种子
     }
-    #train(config)
+    train(config)
 
     # print(os.getcwd())
     # path = os.path.join("global_model_param","central_model")

@@ -35,4 +35,4 @@ class Config:
         raise FileNotFoundError("找不到配置文件 config.toml")
 
 # 初始化配置（项目启动时调用一次）
-# config = Config()
+config = Config()
