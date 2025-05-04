@@ -236,6 +236,14 @@ class CustomFedProx(FedProx):
 
 class CustomFedAdam(FedAdam):
     def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.beta_1 = 0.9
+        self.beta_2 = 0.99
+        self.eta = 0.01
+        self.eta_l = 0.01
+        self.tau = 0.001
+
+        
         self.result_to_save = {}
         self.model_name = configLoader.model.type
 

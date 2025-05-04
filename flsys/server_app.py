@@ -16,7 +16,7 @@ from flsys.task import Net, get_weights, set_weights, test, get_transforms
 from models.MobileNetV3 import get_mobilenet_v3_small_model
 from torch.utils.data import DataLoader
 from datasets import load_dataset
-from flsys.my_strategy import CustomFedAvg
+from flsys.my_strategy import CustomFedAvg, CustomFedAdam
 
 from flsys.config import config as configLoader
 
@@ -61,8 +61,6 @@ def handle_fit_metrics(metrics: List[Tuple[int,Metrics]]) -> Metrics:
 def on_fit_config(server_round: int) -> Metrics:
     """Adjusts learing rate based on current round"""
     lr = 0.01
-    if server_round > 2:
-        lr = 0.005
     return {"lr": lr}
 
 def server_fn(context: Context):
@@ -90,23 +88,33 @@ def server_fn(context: Context):
     testloader = DataLoader(testset.with_transform(get_transforms()), batch_size=32)
 
     # Define strategy
-    strategy = CustomFedAvg(
-        fraction_fit=fraction_fit,
-        fraction_evaluate=0.5,
-        min_available_clients=2,
-        initial_parameters=parameters,
-        evaluate_metrics_aggregation_fn=weighted_average,
+    # strategy = CustomFedAvg(
+    #     fraction_fit=fraction_fit,
+    #     fraction_evaluate=0.5,
+    #     min_available_clients=2,
+    #     initial_parameters=parameters,
+    #     evaluate_metrics_aggregation_fn=weighted_average,
+    #     on_fit_config_fn=on_fit_config,
+    #     evaluate_fn=get_evaluate_fn(testloader,device="cpu"),
+    #     fit_metrics_aggregation_fn=handle_fit_metrics,
+    # )
+
+    strategy = CustomFedAdam(
+        fraction_fit = fraction_fit,
+        fraction_evaluate = 0.5,
+        min_available_clients = 2,
+        initial_parameters = parameters,
+        evaluate_metrics_aggregation_fn = weighted_average,
         on_fit_config_fn=on_fit_config,
         evaluate_fn=get_evaluate_fn(testloader,device="cpu"),
-        fit_metrics_aggregation_fn=handle_fit_metrics,
     )
 
-    dp_strategy = DifferentialPrivacyServerSideFixedClipping(
-        strategy=strategy,
-        noise_multiplier=0.7,
-        clipping_norm=5.0,
-        num_sampled_clients=10,
-    )
+    # dp_strategy = DifferentialPrivacyServerSideFixedClipping(
+    #     strategy=strategy,
+    #     noise_multiplier=0.7,
+    #     clipping_norm=5.0,
+    #     num_sampled_clients=10,
+    # )
 
     config = ServerConfig(num_rounds=num_rounds)
 
@@ -182,6 +190,8 @@ def main(grid:Grid, context:Context):
         evaluate_fn=get_evaluate_fn(testloader,device="cpu"),
         fit_metrics_aggregation_fn=handle_fit_metrics,
     )
+
+    
 
 
     context = LegacyContext(

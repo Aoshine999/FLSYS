@@ -19,6 +19,8 @@ def getresnet18_model(num_classes = 10):
     model = resnet18(
         norm_layer=lambda x: GroupNorm(2, x), num_classes=num_classes
     )
+    
+    model.conv1 = torch.nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
     return model
 
 # 修改后的 Collate Function 以处理 torchvision 数据集返回的 (image, label) 元组
