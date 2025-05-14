@@ -10,7 +10,7 @@ Ref: https://github.com/d-li14/mobilenetv3.pytorch/blob/master/mobilenetv3.py
 
 import torch.nn as nn
 import torch.nn.functional as F
-from torchvision.models import mobilenet_v3_small, MobileNet_V3_Small_Weights
+from torchvision.models import mobilenet_v3_small, mobilenet_v3_large,MobileNet_V3_Small_Weights, MobileNet_V3_Large_Weights
 from collections import OrderedDict
 #from flsys.config import config
 
@@ -36,7 +36,27 @@ def get_mobilenet_v3_small_model(num_classes: int,pretrained: bool):
 
     return model
 
+def get_mobilenet_v3_large_model(num_classes: int, pretrained: bool):
+    """Get MobileNetV3 Large model."""
+    if pretrained == True:
+        model = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.IMAGENET1K_V1)
+    else:
+        model = mobilenet_v3_large()
+    model.features[0][0] = nn.Conv2d(
+        in_channels=3,
+        out_channels=16,
+        kernel_size=3,
+        stride=1,
+        padding=1,
+        bias=False
+    )
 
+    model.classifier[-1] = nn.Linear(
+        in_features=1280,
+        out_features=num_classes,
+    )
+
+    return model
 
 def _ensure_divisible(number, divisor, min_value=None):
     '''

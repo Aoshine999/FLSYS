@@ -7,9 +7,9 @@ from flwr.common import Parameters, FitRes, parameters_to_ndarrays, FitIns, Scal
 from flwr.server.client_proxy import ClientProxy
 from flwr.server.strategy import FedAvg, FedProx, FedAdam, FedAvgM, FedAdagrad, FedYogi
 from flsys.task import Net, set_weights
-from models.MobileNetV3 import get_mobilenet_v3_small_model
+from models.MobileNetV3 import get_mobilenet_v3_small_model, get_mobilenet_v3_large_model
 from flsys.config import config as configLoader
-
+from models.train import get_resnet18_model
 
 
 class CustomFedAvg(FedAvg):
@@ -49,8 +49,12 @@ class CustomFedAvg(FedAvg):
         ndarrays  = parameters_to_ndarrays(parameters_aggregated)
 
         #instance the model
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
         #model = Net()
@@ -77,8 +81,12 @@ class CustomFedAvg(FedAvg):
 
         #存储最优模型
         parameters_ndarrays = parameters_to_ndarrays(parameters)
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
             
@@ -140,7 +148,7 @@ class CustomFedProx(FedProx):
         with open(json_file_path,"w") as json_file:
             json.dump(self.result_to_save,json_file,indent=4)
 
-        wandb.init(project="FL_image_recognition_sys", name=f"{name}", id=f"{self.model_name}-custom-strategy-FedProx")
+        wandb.init(project="FL_image_recognition_sys",  id=f"{self.model_name}-custom-strategy-FedProx",name=f"{name}")
 
     def aggregate_fit(self, server_round: int, results: list[tuple[ClientProxy, FitRes]], failures: list[tuple[ClientProxy, FitRes] | BaseException]) -> tuple[Parameters | None, dict[str, Scalar]]:
         parameters_aggregated, metrics_aggregated =  super().aggregate_fit(server_round, results, failures)
@@ -149,8 +157,12 @@ class CustomFedProx(FedProx):
         ndarrays  = parameters_to_ndarrays(parameters_aggregated)
 
         #instance the model
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
         #model = Net()
@@ -175,8 +187,12 @@ class CustomFedProx(FedProx):
 
         #存储最优模型
         parameters_ndarrays = parameters_to_ndarrays(parameters)
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
             
@@ -265,7 +281,7 @@ class CustomFedAdam(FedAdam):
         with open(json_file_path,"w") as json_file:
             json.dump(self.result_to_save,json_file,indent=4)
         
-        wandb.init(project="FL_image_recognition_sys", name=f"{name}", id=f"{self.model_name}-custom-strategy-FedAdam")
+        wandb.init(project="FL_image_recognition_sys", name=f"{name}", id=f"{name}")
     def aggregate_fit(self, server_round: int, results: list[tuple[ClientProxy, FitRes]], failures: list[tuple[ClientProxy, FitRes] | BaseException]) -> tuple[Parameters | None, dict[str, Scalar]]:
         parameters_aggregated, metrics_aggregated =  super().aggregate_fit(server_round, results, failures)
         
@@ -273,8 +289,12 @@ class CustomFedAdam(FedAdam):
         ndarrays  = parameters_to_ndarrays(parameters_aggregated)
 
         #instance the model
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
         #model = Net()
@@ -296,8 +316,12 @@ class CustomFedAdam(FedAdam):
 
         #存储最优模型
         parameters_ndarrays = parameters_to_ndarrays(parameters)
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
             
@@ -311,7 +335,7 @@ class CustomFedAdam(FedAdam):
 
 
 
-        self.result_to_save[server_round] = my_results
+        self.result_to_save[server_round + 1] = my_results
 
         self.pj_edDate = datetime.now()
 
@@ -368,8 +392,12 @@ class CustomFedAvgM(FedAvgM):
         ndarrays  = parameters_to_ndarrays(parameters_aggregated)
 
         #instance the model
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
         #model = Net()
@@ -391,8 +419,12 @@ class CustomFedAvgM(FedAvgM):
 
         #存储最优模型
         parameters_ndarrays = parameters_to_ndarrays(parameters)
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
             
@@ -464,8 +496,12 @@ class CustomFedAdagrad(FedAdagrad):
         ndarrays  = parameters_to_ndarrays(parameters_aggregated)
 
         #instance the model
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
         #model = Net()
@@ -488,8 +524,10 @@ class CustomFedAdagrad(FedAdagrad):
 
         #存储最优模型
         parameters_ndarrays = parameters_to_ndarrays(parameters)
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
         else:
             model = Net()
             
@@ -561,8 +599,12 @@ class CustomFedYogi(FedYogi):
         ndarrays  = parameters_to_ndarrays(parameters_aggregated)
 
         #instance the model
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            model = get_mobilenet_v3_large_model(10,False)
         else:
             model = Net()
         #model = Net()
@@ -585,8 +627,10 @@ class CustomFedYogi(FedYogi):
 
         #存储最优模型
         parameters_ndarrays = parameters_to_ndarrays(parameters)
-        if configLoader.model.type == "MobileNetV3":
+        if configLoader.model.type == "mobilenet_v3_small":
             model = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            model = get_resnet18_model(10,False)
         else:
             model = Net()
             

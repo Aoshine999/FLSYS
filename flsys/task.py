@@ -8,9 +8,9 @@ import torch.nn.functional as F
 from flwr_datasets import FederatedDataset
 from flwr_datasets.partitioner import IidPartitioner,DirichletPartitioner
 from torch.utils.data import DataLoader
-from torchvision.transforms import Compose, Normalize, ToTensor
+from torchvision.transforms import Compose, Normalize, ToTensor, RandomCrop, RandomHorizontalFlip
 
-
+from torch.amp import autocast, GradScaler
 
 class Net(nn.Module):
     """Model (simple CNN adapted from 'PyTorch: A 60 Minute Blitz')"""
@@ -37,7 +37,7 @@ def get_transforms():
     #     [ToTensor(), Normalize((0.5,0.5,0.5), (0.5,0.5,0.5))]
     # )
     pytorch_transforms = Compose(
-        [ToTensor(), Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))] 
+        [RandomCrop(32), RandomHorizontalFlip(), ToTensor(), Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))] 
     )
 
     def apply_transforms(batch):
@@ -71,43 +71,143 @@ def load_data(partition_id: int, num_partitions: int):
     testloader = DataLoader(partition_train_test["test"], batch_size=32)
     return trainloader, testloader
 
-
 def train(net, trainloader, epochs, lr,device):
     """Train the model on the training set."""
     net.to(device)  # move model to GPU if available
     criterion = torch.nn.CrossEntropyLoss().to(device)
-    #optimizer = torch.optim.Adam(net.parameters(), lr=lr,weight_decay=1e-5)
-    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9,weight_decay=1e-5)
+    optimizer = torch.optim.Adam(net.parameters(), lr=1e-5,weight_decay=1e-5)
+    # optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9,weight_decay=1e-5)
+    
     net.train()
     running_loss = 0.0
+    
+
     for _ in range(epochs):
-        for batch in trainloader:
+        for i,batch in enumerate(trainloader):
             images = batch["img"]
             labels = batch["label"]
             optimizer.zero_grad()
-            loss = criterion(net(images.to(device)), labels.to(device))
+
+
+            outputs = net(images.to(device))
+            loss = criterion(outputs, labels.to(device))
+
             loss.backward()
             optimizer.step()
+
             running_loss += loss.item()
 
     avg_trainloss = running_loss / len(trainloader)
     return avg_trainloss
 
 
+def train1(net, trainloader, epochs, lr,device):
+    """Train the model on the training set."""
+    net.to(device)  # move model to GPU if available
+    criterion = torch.nn.CrossEntropyLoss().to(device)
+    #optimizer = torch.optim.Adam(net.parameters(), lr=lr,weight_decay=1e-5)
+    optimizer = torch.optim.SGD(net.parameters(), lr=lr, momentum=0.9,weight_decay=1e-5)
+
+    scaler = None
+    if device.type == "cuda":  # Check if GPU is available
+        scaler = GradScaler("cuda")
+    
+    net.train()
+    running_loss = 0.0
+    
+    num_batches = len(trainloader) * epochs
+    if num_batches == 0:
+        return 0.0
+    
+
+    for _ in range(epochs):
+        for i,batch in enumerate(trainloader):
+            images = batch["img"]
+            labels = batch["label"]
+            optimizer.zero_grad()
+
+            # Use autocast for mixed precision if on CUDA
+            if device.type == 'cuda':
+                with autocast():
+                    outputs = net(images.to(device))
+                    loss = criterion(outputs, labels.to(device))
+            else: # Standard training on CPU
+                outputs = net(images.to(device))
+                loss = criterion(outputs, labels.to(device))
+
+            # Backward pass and optimizer step
+            if device.type == 'cuda':
+                # Scale loss and perform backward pass
+                scaler.scale(loss).backward()
+                # Unscale gradients and call optimizer.step()
+                scaler.step(optimizer)
+                # Update the scale for next iteration
+                scaler.update()
+            else: # Standard backward and step on CPU
+                loss.backward()
+                optimizer.step()
+
+            running_loss += loss.item()
+
+    avg_trainloss = running_loss / len(trainloader)
+    return avg_trainloss
+
 def test(net, testloader, device):
     """Validate the model on the test set."""
     net.to(device)
     criterion = torch.nn.CrossEntropyLoss()
     correct, loss = 0, 0.0
-    with torch.no_grad():
+
+
+    # net.eval()
+    
+    with torch.no_grad(): # Disable gradient calculation for inference
+        # Use autocast for mixed precision inference if on CUDA
         for batch in testloader:
             images = batch["img"].to(device)
             labels = batch["label"].to(device)
             outputs = net(images)
             loss += criterion(outputs, labels).item()
             correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
-    accuracy = correct / len(testloader.dataset)
-    loss = loss / len(testloader)
+
+
+    accuracy = correct / len(testloader.dataset) if len(testloader.dataset) > 0 else 0.0
+    loss = loss / len(testloader) if len(testloader) > 0 else 0.0
+
+    return loss, accuracy
+
+def test1(net, testloader, device):
+    """Validate the model on the test set."""
+    net.to(device)
+    criterion = torch.nn.CrossEntropyLoss()
+    correct, loss = 0, 0.0
+
+
+    net.eval()
+
+    with torch.no_grad(): # Disable gradient calculation for inference
+        # Use autocast for mixed precision inference if on CUDA
+        if device.type == 'cuda':
+            with autocast():
+                 for batch in testloader:
+                    images = batch["img"].to(device)
+                    labels = batch["label"].to(device)
+                    outputs = net(images)
+                    # Note: criterion typically outputs float32 even within autocast
+                    loss += criterion(outputs, labels).item()
+                    correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+        else: # Standard inference on CPU
+            for batch in testloader:
+                 images = batch["img"].to(device)
+                 labels = batch["label"].to(device)
+                 outputs = net(images)
+                 loss += criterion(outputs, labels).item()
+                 correct += (torch.max(outputs.data, 1)[1] == labels).sum().item()
+
+
+    accuracy = correct / len(testloader.dataset) if len(testloader.dataset) > 0 else 0.0
+    loss = loss / len(testloader) if len(testloader) > 0 else 0.0
+
     return loss, accuracy
 
 

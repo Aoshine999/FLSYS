@@ -3,22 +3,29 @@ import json
 import wandb
 import os
 import psutil
-import signal
-import atexit
-import sys
-import time
+import torch
+import flwr.common.logger as flwr_logger
+# import signal
+# import atexit
+# import sys
+# import time
 from typing import List,Tuple
 from flwr.common import Context, ndarrays_to_parameters, Metrics
 from flwr.server import ServerApp, ServerAppComponents, ServerConfig, Grid, LegacyContext
 from flwr.server.strategy import FedAvg, DifferentialPrivacyServerSideFixedClipping
 from flwr.server.workflow import DefaultWorkflow, SecAggPlusWorkflow
 from flsys.task import Net, get_weights, set_weights, test, get_transforms
-from models.MobileNetV3 import get_mobilenet_v3_small_model
+from models.MobileNetV3 import get_mobilenet_v3_small_model, get_mobilenet_v3_large_model
+from models.train import get_resnet18_model
 from torch.utils.data import DataLoader
 from datasets import load_dataset
 from flsys.my_strategy import CustomFedAvg, CustomFedAdam
 
 from flsys.config import config as configLoader
+
+
+flwr_logger.console_handler.setLevel("DEBUG")
+# flwr_logger.console_handler.setLevel("DEBUG")
 
 def get_evaluate_fn(testloader,device):
     """return a callback that evaluates the gloabl model"""
@@ -26,6 +33,10 @@ def get_evaluate_fn(testloader,device):
         #Instance model
         if configLoader.model.type == "mobilenet_v3_small":
             net = get_mobilenet_v3_small_model(10,False)
+        elif configLoader.model.type == "resnet18":
+            net = get_resnet18_model(10,False)
+        elif configLoader.model.type == "mobilenet_v3_large":
+            net = get_mobilenet_v3_large_model(10,False)
         else:
             net = Net()
 
@@ -61,6 +72,8 @@ def handle_fit_metrics(metrics: List[Tuple[int,Metrics]]) -> Metrics:
 def on_fit_config(server_round: int) -> Metrics:
     """Adjusts learing rate based on current round"""
     lr = 0.01
+    if server_round >= 200:
+        lr = 0.005
     return {"lr": lr}
 
 def server_fn(context: Context):
@@ -74,6 +87,10 @@ def server_fn(context: Context):
     # Initialize model parameters
     if config.model.type == "mobilenet_v3_small":
         ndarrays = get_weights(get_mobilenet_v3_small_model(10,True))
+    elif config.model.type == "resnet18":
+        ndarrays = get_weights(get_resnet18_model(10,True))
+    elif config.model.type == "mobilenet_v3_large":
+        ndarrays = get_weights(get_mobilenet_v3_large_model(10,True))
     else:
         ndarrays = get_weights(Net())
 
@@ -99,6 +116,7 @@ def server_fn(context: Context):
     #     fit_metrics_aggregation_fn=handle_fit_metrics,
     # )
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     strategy = CustomFedAdam(
         fraction_fit = fraction_fit,
         fraction_evaluate = 0.5,
@@ -106,7 +124,7 @@ def server_fn(context: Context):
         initial_parameters = parameters,
         evaluate_metrics_aggregation_fn = weighted_average,
         on_fit_config_fn=on_fit_config,
-        evaluate_fn=get_evaluate_fn(testloader,device="cpu"),
+        evaluate_fn=get_evaluate_fn(testloader,device=device),
     )
 
     # dp_strategy = DifferentialPrivacyServerSideFixedClipping(
@@ -164,12 +182,16 @@ def main(grid:Grid, context:Context):
     fraction_fit = context.run_config["fraction-fit"]
     
     # Initialize model parameters
-    # if configLoader.model.type == "mobilenet_v3_small":
-    #     ndarrays = get_weights(get_mobilenet_v3_small_model(10,True))
-    # else:
-    #     ndarrays = get_weights(Net())
+    if configLoader.model.type == "mobilenet_v3_small":
+        ndarrays = get_weights(get_mobilenet_v3_small_model(10,True))
+    elif configLoader.model.type == "resnet18":
+        ndarrays = get_weights(get_resnet18_model(10,True))
+    elif configLoader.model.type == "mobilenet_v3_large":
+        ndarrays = get_weights(get_mobilenet_v3_large_model(10,True))
+    else:
+        ndarrays = get_weights(Net())
 
-    ndarrays = get_weights(Net())
+    # ndarrays = get_weights(Net())
     parameters = ndarrays_to_parameters(ndarrays)
 
     # load test dataset
@@ -178,20 +200,29 @@ def main(grid:Grid, context:Context):
     #construct testloader
     testloader = DataLoader(testset.with_transform(get_transforms()), batch_size=32)
 
-
-    # Define strategy
-    strategy = CustomFedAvg(
-        fraction_fit=1.0,
-        fraction_evaluate=0.5,
-        min_available_clients=2,
-        initial_parameters=parameters,
-        evaluate_metrics_aggregation_fn=weighted_average,
-        on_fit_config_fn=on_fit_config,
-        evaluate_fn=get_evaluate_fn(testloader,device="cpu"),
-        fit_metrics_aggregation_fn=handle_fit_metrics,
-    )
-
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
+    # Define strategy
+    # strategy = CustomFedAvg(
+    #     fraction_fit=1.0,
+    #     fraction_evaluate=0.5,
+    #     min_available_clients=2,
+    #     initial_parameters=parameters,
+    #     evaluate_metrics_aggregation_fn=weighted_average,
+    #     on_fit_config_fn=on_fit_config,
+    #     evaluate_fn=get_evaluate_fn(testloader,device="cpu"),
+    #     fit_metrics_aggregation_fn=handle_fit_metrics,
+    # )
+
+    strategy = CustomFedAdam(
+        fraction_fit = fraction_fit,
+        fraction_evaluate = 0.5,
+        min_available_clients = 2,
+        initial_parameters = parameters,
+        evaluate_metrics_aggregation_fn = weighted_average,
+        on_fit_config_fn=on_fit_config,
+        evaluate_fn=get_evaluate_fn(testloader,device=device),
+    )
 
 
     context = LegacyContext(
@@ -205,6 +236,8 @@ def main(grid:Grid, context:Context):
         num_shares=context.run_config["num-shares"],
         reconstruction_threshold=context.run_config["reconstruction-threshold"],
         max_weight=context.run_config["max-weight"],
+        modulus_range=2**30,
+        quantization_range=2**20,
     )
 
 

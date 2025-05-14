@@ -7,7 +7,8 @@ from flwr.client import ClientApp, NumPyClient
 from flwr.common import Context, ConfigRecord
 from flwr.client.mod import secaggplus_mod
 from flsys.task import Net, get_weights, load_data, set_weights, test, train
-from models.MobileNetV3 import get_mobilenet_v3_small_model
+from models.MobileNetV3 import get_mobilenet_v3_small_model, get_mobilenet_v3_large_model
+from models.train import get_resnet18_model
 from flsys.config import config as configLoader
 
 
@@ -77,6 +78,10 @@ def client_fn(context: Context):
     # Load model and data
     if configLoader.model.type == "mobilenet_v3_small":
         net = get_mobilenet_v3_small_model(10,True)
+    elif configLoader.model.type == "resnet18":
+        net = get_resnet18_model(10,True)
+    elif configLoader.model.type == "mobilenet_v3_large":
+        net = get_mobilenet_v3_large_model(10,True)
     else:
         net = Net()
     #net = Net()

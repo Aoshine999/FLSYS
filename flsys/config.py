@@ -36,3 +36,4 @@ class Config:
 
 # 初始化配置（项目启动时调用一次）
 config = Config()
+

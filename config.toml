@@ -1,6 +1,6 @@
 # 模型配置节
 [model]
-type = "Net"    # 可选值：Net / MobileNetV3
+type = "mobilenet_v3_small"    # 可选值：Net / mobilenet_v3_small / resnet18 / mobilenet_v3_large
 num_classes = 10        # 分类任务类别数
 pretrained = false       # 是否使用预训练权重
 save_dir = "global_model_param"  # 模型保存目录

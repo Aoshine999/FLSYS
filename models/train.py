@@ -6,11 +6,11 @@ import json
 from datetime import datetime
 from torchvision import transforms
 from torch.nn import GroupNorm
-from torchvision.models import resnet18
+from torchvision.models import resnet18, ResNet18_Weights
 from torch.utils.data import DataLoader
 from datasets import load_dataset, DatasetDict
 from tqdm import tqdm
-from models.MobileNetV3 import get_mobilenet_v3_small_model
+from models.MobileNetV3 import get_mobilenet_v3_small_model,get_mobilenet_v3_large_model
 from torchvision.transforms import (
     CenterCrop,
     Compose,
@@ -22,12 +22,37 @@ from torchvision.transforms import (
 
 
 
-def getresnet18_model(num_classes = 10):
-    model = resnet18(
+def get_resnet18_model1(num_classes = 10,pretrained = False):
+
+    if pretrained == True:
+        model = resnet18(
+        norm_layer=lambda x: GroupNorm(2, x), num_classes=num_classes, weights=ResNet18_Weights.IMAGENET1K_V1
+    )
+    else:
+        model = resnet18(
         norm_layer=lambda x: GroupNorm(2, x), num_classes=num_classes
     )
+    # 修改第一个卷积层，适应32x32输入
+    model.conv1 = torch.nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
 
     return model
+
+def get_resnet18_model(num_classes = 10,pretrained = False):
+
+    if pretrained == True:
+        model = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
+    else:
+        model = resnet18()
+    # 修改第一个卷积层，适应32x32输入
+    model.conv1 = torch.nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+
+    in_feas = model.fc.in_features
+    new_fc_layer = torch.nn.Linear(in_feas,num_classes)
+
+    model.fc = new_fc_layer
+    
+    return model
+    
 # 将 collate_fn 定义移到这里 (顶层)
 def top_level_collate_fn(batch):
     # 确保 batch 中的元素确实是字典，并且有 'pixel_values' 和 'label'键
@@ -54,7 +79,7 @@ def load_data(dataset_name = "uoft-cs",batch_size = 32,image_size = 224,val_rati
     """
     transform = transforms.Compose([
         transforms.Resize(image_size),  # 调整图像大小
-        #transforms.RandomHorizontalFlip(),  # 随机水平翻转
+        transforms.RandomHorizontalFlip(),  # 随机水平翻转
         transforms.ToTensor(),  # 转换为张量
         transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2470, 0.2435, 0.2616))  # 归一化 
     ])
@@ -160,16 +185,17 @@ def train(config):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     if config["model_name"] == "resnet18":
-        model = getresnet18_model(num_classes=config["name_classes"])
+        model = get_resnet18_model(num_classes=config["name_classes"])
     elif config["model_name"] == "mobilenet_v3_small":
         model = get_mobilenet_v3_small_model(num_classes=config["name_classes"], pretrained=config["pretrained"])
-
+    elif config["model_name"] == "mobilenet_v3_large":
+        model = get_mobilenet_v3_large_model(num_classes=config["name_classes"], pretrained=config["pretrained"])
     #model = get_mobilenet_v3_small_model(num_classes=len(class_names), pretrained=config["pretrained"])
 
     model.to(device)
 
 
-    wandb.init(project=f"{config['model_name']} centralization train", config=config,id=f"{config['model_name']}_centralization",name=f"{config['model_name']}_centralization_{date}")
+    wandb.init(project="FL_image_recognition_sys", config=config,id=f"{config['model_name']}_centralization",name=f"{config['model_name']}_centralization_{date}")
 
     # 加载数据
     train_loader,val_loader, test_loader, class_names = load_data(
@@ -323,20 +349,27 @@ def evaluate_model(model, dataloader,criterion, device):
 
 # 运行配置
 if __name__ == "__main__":
+
     config = {
         "dataset_name": "uoft-cs/cifar10",
         "model_name": "resnet18",
         "name_classes": 10,
         "image_size": 32,
         "batch_size": 64,
-        "num_epochs": 2,
+        "num_epochs": 60,
         "lr": 0.01,
-        "weight_decay": 1e-4,
+        "weight_decay": 1e-5,
         "val_ratio": 0.2,  
         "pretrained": True,
         "seed": 42        # 固定随机种子
     }
-    train(config)
+    model_name = {"resnet18","mobilenet_v3_small"}
+    for model in model_name:
+        config["model_name"] = model
+        train(config)
+        print(f"模型{model}训练完成")
+
+    
 
     # print(os.getcwd())
     # path = os.path.join("global_model_param","central_model")
